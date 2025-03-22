@@ -1,4 +1,4 @@
-# Instalar as bibliotecas necessárias (caso não estejam instaladas)
+# Install required libraries (if not installed)
 !pip install -q kaggle torch torchvision torchaudio albumentations opencv-python matplotlib numpy pandas
 
 import os
@@ -19,48 +19,48 @@ import torchvision
 from torchvision import datasets, transforms, models
 from PIL import Image
 
-# Desabilitar warnings
+# Disable warnings
 warnings.filterwarnings('ignore')
 
-# Configurar dispositivo (GPU se disponível)
+# Configure device (GPU if available)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Usando dispositivo: {device}")
+print(f"Using device: {device}")
 
 #########################################
-# Montar Google Drive e extrair o dataset
+# Mount Google Drive and extract dataset
 #########################################
 from google.colab import drive
 drive.mount('/content/drive')
 
-# Caminho do arquivo ZIP no Google Drive
+# Path to the ZIP file on Google Drive
 zip_file = "/content/drive/MyDrive/new-plant-diseases-dataset.zip"
 
-# Diretório para extração
+# Extraction directory
 extract_path = "/content/dataset"
 os.makedirs(extract_path, exist_ok=True)
 
-# Extrair o ZIP (se já não tiver sido extraído)
+# Extract ZIP (if not already extracted)
 if not os.path.exists(os.path.join(extract_path, "New Plant Diseases Dataset(Augmented)")):
     with zipfile.ZipFile(zip_file, 'r') as zip_ref:
         zip_ref.extractall(extract_path)
-    print("Dataset extraído com sucesso!")
+    print("Dataset successfully extracted!")
 else:
-    print("Dataset já extraído.")
+    print("Dataset already extracted.")
 
-# Definir diretórios de treino e validação
-# Ajuste o caminho de acordo com a estrutura do ZIP
+# Define training and validation directories
+# Adjust path according to ZIP structure
 train_dir = os.path.join(extract_path, "New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)", "train")
 valid_dir = os.path.join(extract_path, "New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)", "valid")
 
-# Listar as classes presentes no diretório de treino
+# List classes present in the training directory
 Diseases_classes = sorted(os.listdir(train_dir))
-print(f"Total de classes: {len(Diseases_classes)}")
-print(f"Classes encontradas: {Diseases_classes}")
+print(f"Total classes: {len(Diseases_classes)}")
+print(f"Classes found: {Diseases_classes}")
 
 #########################################
-# Definir as transformações e carregar os dados
+# Define transformations and load data
 #########################################
-# Transformações com Data Augmentation para treino e normalização para validação
+# Data Augmentation transformations for training and normalization for validation
 train_transform = transforms.Compose([
     transforms.RandomResizedCrop(224),
     transforms.RandomHorizontalFlip(),
@@ -76,37 +76,37 @@ valid_transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-# Carregar datasets usando ImageFolder
+# Load datasets using ImageFolder
 train_dataset = datasets.ImageFolder(root=train_dir, transform=train_transform)
 valid_dataset = datasets.ImageFolder(root=valid_dir, transform=valid_transform)
 
-print(f"Total de imagens no treino: {len(train_dataset)}")
-print(f"Total de imagens na validação: {len(valid_dataset)}")
+print(f"Total training images: {len(train_dataset)}")
+print(f"Total validation images: {len(valid_dataset)}")
 
-# Criar DataLoaders
+# Create DataLoaders
 batch_size = 32
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
 valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
 #########################################
-# Preparar o modelo (ResNet50 com transferência de aprendizado)
+# Prepare model (ResNet50 with transfer learning)
 #########################################
-# Carregar modelo pré-treinado e ajustar a camada final
+# Load pre-trained model and adjust final layer
 model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
 num_ftrs = model.fc.in_features
 model.fc = nn.Linear(num_ftrs, len(Diseases_classes))
 model = model.to(device)
 
-# Habilitar mixed precision
+# Enable mixed precision
 scaler = torch.cuda.amp.GradScaler()
 
-# Definir função de perda e otimizador
+# Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-4)
-scheduler = StepLR(optimizer, step_size=5, gamma=0.1)  # Reduzir LR a cada 5 épocas
+scheduler = StepLR(optimizer, step_size=5, gamma=0.1)  # Reduce LR every 5 epochs
 
 #########################################
-# Treinamento com Early Stopping
+# Training with Early Stopping
 #########################################
 num_epochs = 20
 best_acc = 0.0
@@ -140,7 +140,7 @@ for epoch in range(num_epochs):
     train_loss = running_loss / total
     train_acc = 100. * correct / total
     
-    # Validação
+    # Validation
     model.eval()
     val_loss = 0.0
     correct = 0
@@ -162,11 +162,11 @@ for epoch in range(num_epochs):
     scheduler.step()
     
     elapsed_time = time.time() - start_time
-    print(f"Época {epoch+1}/{num_epochs} | Tempo: {elapsed_time:.2f}s | "
+    print(f"Epoch {epoch+1}/{num_epochs} | Time: {elapsed_time:.2f}s | "
           f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
           f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%")
     
-    # Early stopping e salvamento do melhor modelo
+    # Early stopping and saving best model
     if val_acc > best_acc:
         best_acc = val_acc
         wait = 0
@@ -174,16 +174,15 @@ for epoch in range(num_epochs):
     else:
         wait += 1
         if wait >= patience:
-            print("Early stopping ativado!")
+            print("Early stopping activated!")
             break
 
-print("Treinamento finalizado. Modelo salvo como 'best_model.pth'")
+print("Training completed. Model saved as 'best_model.pth'")
 
 #########################################
-# Funções para carregar o modelo e realizar inferência
+# Functions to load trained model and perform inference
 #########################################
 def load_trained_model():
-    # Recriar o modelo e carregar os pesos salvos
     model_trained = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
     num_ftrs = model_trained.fc.in_features
     model_trained.fc = nn.Linear(num_ftrs, len(Diseases_classes))
@@ -193,7 +192,7 @@ def load_trained_model():
 
 def predict_image(image_path):
     image = Image.open(image_path).convert('RGB')
-    image_tensor = valid_transform(image).unsqueeze(0)  # Adiciona dimensão de batch
+    image_tensor = valid_transform(image).unsqueeze(0)
     trained_model = load_trained_model()
     
     with torch.no_grad():
@@ -201,16 +200,4 @@ def predict_image(image_path):
         _, predicted = torch.max(outputs, 1)
     
     result = Diseases_classes[predicted.item()]
-    print(f"A planta está com: {result}")
-#########################################
-# Upload de imagem e inferência (Google Colab)
-#########################################
-from google.colab import files
-
-uploaded = files.upload()  # Selecione a imagem para inferência
-
-# Se mais de uma imagem for enviada, usamos a primeira
-for file_name in uploaded.keys():
-    print(f"Arquivo carregado: {file_name}")
-    predict_image(file_name)
-    break  # Remova o break se desejar iterar por todas as imagens
+    print(f"The plant is diagnosed with: {result}")
